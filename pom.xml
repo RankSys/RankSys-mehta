@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright (C) 2016 RankSys http://ranksys.org
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.ranksys</groupId>
+    <artifactId>RankSys-mehta</artifactId>
+    <version>0.5.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <ranksys.version>0.5.0-SNAPSHOT</ranksys.version>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>org.ranksys</groupId>
+            <artifactId>RankSys-metrics</artifactId>
+            <version>${ranksys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ranksys</groupId>
+            <artifactId>RankSys-evaluation</artifactId>
+            <version>${ranksys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ranksys</groupId>
+            <artifactId>RankSys-recommenders</artifactId>
+            <version>${ranksys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ranksys</groupId>
+            <artifactId>RankSys-novdiv</artifactId>
+            <version>${ranksys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ranksys</groupId>
+            <artifactId>RankSys-core</artifactId>
+            <version>${ranksys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ranksys</groupId>
+            <artifactId>RankSys-compression</artifactId>
+            <version>${ranksys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ranksys</groupId>
+            <artifactId>RankSys-formats</artifactId>
+            <version>${ranksys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>it.unimi.dsi</groupId>
+            <artifactId>fastutil</artifactId>
+            <version>7.0.6</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jool</artifactId>
+            <version>0.9.10</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>4.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-throwingproviders</artifactId>
+            <version>4.1.0</version>
+        </dependency>    
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.2</version>
+                <configuration>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.10</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.5</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
