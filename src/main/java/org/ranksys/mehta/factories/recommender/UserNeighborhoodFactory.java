@@ -8,7 +8,6 @@
 package org.ranksys.mehta.factories.recommender;
 
 import com.google.inject.Inject;
-import java.util.function.Supplier;
 import org.ranksys.core.index.fast.FastUserIndex;
 import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.mehta.factories.MehtaFactory;
@@ -16,6 +15,9 @@ import org.ranksys.novdiv.inverted.neighborhood.InvertedUserNeighborhood;
 import org.ranksys.recommenders.nn.user.neighborhood.UserNeighborhood;
 import org.ranksys.recommenders.nn.user.neighborhood.UserNeighborhoods;
 import org.ranksys.recommenders.nn.user.sim.UserSimilarity;
+
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  *
@@ -33,33 +35,30 @@ public class UserNeighborhoodFactory implements MehtaFactory<UserNeighborhood<St
     }
 
     @Override
-    public UserNeighborhood<String> create(MehtaParameters params) throws Exception {
-        UserNeighborhood<String> userNeighborhood;
+    public Optional<UserNeighborhood<String>> create(MehtaParameters params) {
 
-        Supplier<UserSimilarity<String>> uss = () -> usf.create(params.subset("sim"));
-        boolean cached = params.getBoolean("cached", false);
+        Supplier<Optional<UserSimilarity<String>>> uss = () -> params.subset("sim").flatMap(usf::create);
 
+        Optional<UserNeighborhood<String>> userNeighborhood;
         switch (params.name()) {
             case "knn":
-                userNeighborhood = UserNeighborhoods.topK(uss.get(), params.getInt("k", 10));
+                userNeighborhood = uss.get().map(us -> UserNeighborhoods.topK(us, params.getInt("k", 100)));
                 break;
             case "threshold":
-                userNeighborhood = UserNeighborhoods.threshold(uss.get(), params.getDouble("t"));
+                userNeighborhood = uss.get().flatMap(us -> params.getDouble("t").map(t -> UserNeighborhoods.threshold(us, t)));
                 break;
             case "inverted":
-                userNeighborhood = UserNeighborhoods.topK(uss.get(), params.getInt("k", 10));
-                userNeighborhood = new InvertedUserNeighborhood<>(userNeighborhood, users::containsUser);
-                cached = false;
+                userNeighborhood = uss.get()
+                        .map(us -> UserNeighborhoods.topK(us, params.getInt("k", 100)))
+                        .map(un -> new InvertedUserNeighborhood<>(un, users::containsUser));
                 break;
             default:
-                userNeighborhood = null;
+                userNeighborhood = Optional.empty();
         }
 
-        if (cached) {
-            userNeighborhood = UserNeighborhoods.cached(userNeighborhood);
-        }
+        boolean cached = params.getBoolean("cached", false) && !params.name().equals("inverted");
 
-        return userNeighborhood;
+        return userNeighborhood.map(un -> cached ? UserNeighborhoods.cached(un) : un);
     }
 
 }

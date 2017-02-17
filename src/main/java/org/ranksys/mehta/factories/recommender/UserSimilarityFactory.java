@@ -11,10 +11,13 @@ import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.name.Named;
 import org.ranksys.core.preference.fast.FastPreferenceData;
-import org.ranksys.recommenders.nn.user.sim.UserSimilarity;
 import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.mehta.factories.MehtaFactory;
 import org.ranksys.recommenders.nn.user.sim.UserSimilarities;
+import org.ranksys.recommenders.nn.user.sim.UserSimilarity;
+
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  *
@@ -31,33 +34,24 @@ public class UserSimilarityFactory implements MehtaFactory<UserSimilarity<String
     }
 
     @Override
-    public UserSimilarity<String> create(MehtaParameters params) {
-        UserSimilarity<String> userSimilarity;
+    public Optional<UserSimilarity<String>> create(MehtaParameters params) {
 
-        double alpha = params.getDouble("alpha", 0.5);
-        boolean dense = params.getBoolean("dense", true);
+        Supplier<Boolean> dense = () -> params.getBoolean("dense", true);
 
         switch (params.name()) {
             case "cosine":
             case "set-cosine":
-                userSimilarity = UserSimilarities.setCosine(tpp.get(), alpha, dense);
-                break;
+                return Optional.of(UserSimilarities.setCosine(tpp.get(), params.getDouble("alpha", 0.5), dense.get()));
             case "vec-cosine":
-                userSimilarity = UserSimilarities.vectorCosine(tpp.get(), dense);
-                break;
+                return Optional.of(UserSimilarities.vectorCosine(tpp.get(), dense.get()));
             case "jaccard":
             case "set-jaccard":
-                userSimilarity = UserSimilarities.setJaccard(tpp.get(), dense);
-                break;
+                return Optional.of(UserSimilarities.setJaccard(tpp.get(), dense.get()));
             case "vec-jaccard":
-                userSimilarity = UserSimilarities.vectorJaccard(tpp.get(), dense);
-                break;
+                return Optional.of(UserSimilarities.vectorJaccard(tpp.get(), dense.get()));
             default:
-                userSimilarity = null;
-                break;
+                return Optional.empty();
         }
-        
-        return userSimilarity;
     }
 
 }

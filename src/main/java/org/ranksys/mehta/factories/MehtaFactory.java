@@ -9,11 +9,13 @@ package org.ranksys.mehta.factories;
 
 import org.ranksys.mehta.config.MehtaParameters;
 
+import java.util.Optional;
+
 /**
  *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
  */
 public interface MehtaFactory<T> {
 
-    public T create(MehtaParameters params) throws Exception;
+    public Optional<T> create(MehtaParameters params);
 }

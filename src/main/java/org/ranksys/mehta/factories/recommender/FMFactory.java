@@ -10,7 +10,6 @@ package org.ranksys.mehta.factories.recommender;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.name.Named;
-import java.util.function.Supplier;
 import org.ranksys.core.index.fast.FastItemIndex;
 import org.ranksys.core.index.fast.FastUserIndex;
 import org.ranksys.core.preference.fast.FastPreferenceData;
@@ -21,18 +20,21 @@ import org.ranksys.recommenders.fm.learner.BPRLearner;
 import org.ranksys.recommenders.fm.learner.PreferenceFMLearner;
 import org.ranksys.recommenders.fm.learner.RMSELearner;
 
+import java.util.Optional;
+import java.util.function.Supplier;
+
 /**
  *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
  */
-public class FMSupplierFactory implements MehtaFactory<Supplier<PreferenceFM<String, String>>> {
+public class FMFactory implements MehtaFactory<PreferenceFM<String, String>> {
 
     private final FastUserIndex<String> users;
     private final FastItemIndex<String> items;
     private final Provider<FastPreferenceData<String, String>> tpp;
 
     @Inject
-    public FMSupplierFactory(
+    public FMFactory(
             FastUserIndex<String> users, FastItemIndex<String> items,
             @Named("trainPreferences") Provider<FastPreferenceData<String, String>> tpp) {
         this.users = users;
@@ -41,34 +43,28 @@ public class FMSupplierFactory implements MehtaFactory<Supplier<PreferenceFM<Str
     }
 
     @Override
-    public Supplier<PreferenceFM<String, String>> create(MehtaParameters params) throws Exception {
-        PreferenceFMLearner<String, String> learner;
+    public Optional<PreferenceFM<String, String>> create(MehtaParameters params) {
 
-        double learnRate = params.getDouble("learnRate", 0.01);
-        int numIter = params.getInt("numIter", 50);
-        double regB = params.getDouble("regB", 0.01);
-        double regW = params.getDouble("regW", 0.01);
-        double regM = params.getDouble("regM", 0.01);
-        double negativeProp = params.getDouble("negativeProp", 2.0);
-        int K = params.getInt("k", 100);
-        double sdev = params.getDouble("sdev", 0.1);
+        Supplier<Double> learnRate = () -> params.getDouble("learnRate", 0.01);
+        Supplier<Integer> numIter = () -> params.getInt("numIter", 50);
+        Supplier<Double> regB = () -> params.getDouble("regB", 0.01);
+        Supplier<Double> regW = () -> params.getDouble("regW", 0.01);
+        Supplier<Double> regM = () -> params.getDouble("regM", 0.01);
 
+        Optional<PreferenceFMLearner<String, String>> learner;
         switch (params.name()) {
             case "rmse":
-                learner = new RMSELearner<>(learnRate, numIter, regB, regW, regM, negativeProp, users, items);
+                double negativeProp = params.getDouble("negativeProp", 2.0);
+                learner = Optional.of(new RMSELearner<>(learnRate.get(), numIter.get(), regB.get(), regW.get(), regM.get(), negativeProp, users, items));
                 break;
             case "bpr":
-                learner = new BPRLearner<>(learnRate, numIter, regW, regM, users, items);
+                learner = Optional.of(new BPRLearner<>(learnRate.get(), numIter.get(), regW.get(), regM.get(), users, items));
                 break;
             default:
-                learner = null;
+                learner = Optional.empty();
         }
 
-        if (learner == null) {
-            return () -> null;
-        } else {
-            return () -> learner.learn(tpp.get(), K, sdev);
-        }
+        return learner.map(l -> l.learn(tpp.get(), params.getInt("k", 100), params.getDouble("sdev", 0.1)));
     }
 
 }

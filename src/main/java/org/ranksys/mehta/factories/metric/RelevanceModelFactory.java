@@ -20,6 +20,9 @@ import org.ranksys.metrics.rel.NoRelevanceModel;
 import org.ranksys.metrics.rel.RelevanceModel;
 import org.ranksys.novdiv.intentaware.metrics.ERRIA;
 
+import java.util.Optional;
+import java.util.function.Supplier;
+
 /**
  *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
@@ -35,36 +38,33 @@ public class RelevanceModelFactory implements MehtaFactory<RelevanceModel<String
     }
 
     @Override
-    public RelevanceModel<String, String> create(MehtaParameters params) {
+    public Optional<RelevanceModel<String, String>> create(MehtaParameters params) {
         
-        RelevanceModel<String, String> relModel;
-        
-        double l = params.getDouble("threshold", 1.0);
+        Supplier<Double> l = () -> params.getDouble("threshold", 1.0);
 
+        Optional<RelevanceModel<String, String>> relModel;
         switch (params.name()) {
             case "bin":
-                relModel = new BinaryRelevanceModel<>(true, tpp.get(), l);
+                relModel = Optional.of(new BinaryRelevanceModel<>(true, tpp.get(), l.get()));
                 break;
             case "none":
-                relModel = new NoRelevanceModel<>();
+                relModel = Optional.of(new NoRelevanceModel<>());
                 break;
             case "bck":
-                double background = params.getDouble("background");
-                relModel = new BackgroundBinaryRelevanceModel<>(true, tpp.get(), l, background);
+                relModel = params.getDouble("background").map(b -> new BackgroundBinaryRelevanceModel<>(true, tpp.get(), l.get(), b));
                 break;
             case "ndcg":
-                relModel = new NDCG.NDCGRelevanceModel<>(true, tpp.get(), l);
+                relModel = Optional.of(new NDCG.NDCGRelevanceModel<>(true, tpp.get(), l.get()));
                 break;
             case "err":
-                relModel = new ERRIA.ERRRelevanceModel<>(true, tpp.get(), l);
+                relModel = Optional.of(new ERRIA.ERRRelevanceModel<>(true, tpp.get(), l.get()));
                 break;
             default:
-                relModel = null;
+                relModel = Optional.empty();
                 break;
         }
-        if (relModel != null) {
-            relModel.initialize();
-        }
+
+        relModel.ifPresent(RelevanceModel::initialize);
 
         return relModel;
     }

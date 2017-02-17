@@ -13,14 +13,6 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
 import com.google.inject.name.Names;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.function.IntPredicate;
-import static java.util.stream.Collectors.toSet;
-import java.util.stream.Stream;
 import org.jooq.lambda.Unchecked;
 import org.jooq.lambda.tuple.Tuple3;
 import org.ranksys.core.index.fast.FastItemIndex;
@@ -34,14 +26,20 @@ import org.ranksys.evaluation.runner.fast.FastFilterRecommenderRunner;
 import org.ranksys.evaluation.runner.fast.FastFilters;
 import org.ranksys.formats.index.ItemsReader;
 import org.ranksys.formats.index.UsersReader;
-import static org.ranksys.formats.parsing.Parsers.sp;
 import org.ranksys.formats.preference.SimpleRatingPreferencesReader;
-import org.ranksys.formats.rec.MahoutRecommendationFormat;
-import org.ranksys.formats.rec.RecommendationFormat;
-import org.ranksys.formats.rec.SimpleRecommendationFormat;
-import org.ranksys.formats.rec.TRECRecommendationFormat;
-import org.ranksys.formats.rec.ZipRecommendationFormat;
+import org.ranksys.formats.rec.*;
 import org.ranksys.mehta.factories.FilterFactory;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.IntPredicate;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toSet;
+import static org.ranksys.formats.parsing.Parsers.sp;
 
 /**
  *
@@ -131,9 +129,9 @@ public class MehtaModule extends AbstractModule {
     public Function<String, IntPredicate> getFilters(
             @Named("filters") String filters, FilterFactory filterFactory) {
         return Stream.of(filters.split(","))
-                .map(Unchecked.function(filterName -> filterFactory.create(filterName)))
+                .map(Unchecked.function(filterFactory::create))
                 .reduce(FastFilters::and)
-                .get();
+                .orElseGet(FastFilters::all);
     }
 
     @Provides

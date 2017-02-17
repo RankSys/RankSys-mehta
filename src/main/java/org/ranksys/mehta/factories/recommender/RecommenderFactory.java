@@ -10,33 +10,36 @@ package org.ranksys.mehta.factories.recommender;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.name.Named;
-import java.nio.file.Files;
-import org.ranksys.recommenders.mf.Factorization;
-import org.ranksys.recommenders.mf.rec.MFRecommender;
-import org.ranksys.recommenders.nn.item.ItemNeighborhoodRecommender;
-import org.ranksys.recommenders.nn.item.neighborhood.ItemNeighborhood;
-import org.ranksys.recommenders.nn.user.UserNeighborhoodRecommender;
-import org.ranksys.recommenders.nn.user.neighborhood.UserNeighborhood;
-import org.ranksys.recommenders.fast.FastRecommender;
-import org.ranksys.recommenders.basic.PopularityRecommender;
-import org.ranksys.recommenders.basic.RandomRecommender;
-import org.ranksys.mehta.config.MehtaParameters;
-import java.util.Set;
+import org.jooq.lambda.Unchecked;
 import org.ranksys.core.index.fast.FastItemIndex;
 import org.ranksys.core.index.fast.FastUserIndex;
 import org.ranksys.core.preference.fast.FastPreferenceData;
 import org.ranksys.formats.factorization.SimpleFMFormat;
 import org.ranksys.formats.factorization.SimpleFactorizationFormat;
-import org.ranksys.recommenders.fm.PreferenceFM;
-import org.ranksys.recommenders.fm.rec.FMRecommender;
+import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.mehta.config.MehtaProperties;
 import org.ranksys.mehta.factories.MehtaFactory;
+import org.ranksys.recommenders.basic.PopularityRecommender;
+import org.ranksys.recommenders.basic.RandomRecommender;
+import org.ranksys.recommenders.fast.FastRecommender;
+import org.ranksys.recommenders.fm.PreferenceFM;
+import org.ranksys.recommenders.fm.rec.FMRecommender;
+import org.ranksys.recommenders.mf.Factorization;
+import org.ranksys.recommenders.mf.rec.MFRecommender;
+import org.ranksys.recommenders.nn.item.ItemNeighborhoodRecommender;
+import org.ranksys.recommenders.nn.user.UserNeighborhoodRecommender;
+
+import java.nio.file.Files;
+import java.util.Optional;
+import java.util.Set;
+import java.util.logging.Logger;
 
 /**
- *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
  */
 public class RecommenderFactory implements MehtaFactory<FastRecommender<String, String>> {
+
+    private static final Logger LOG = Logger.getLogger(RecommenderFactory.class.getName());
 
     private final MehtaProperties properties;
     private final FastUserIndex<String> users;
@@ -44,8 +47,8 @@ public class RecommenderFactory implements MehtaFactory<FastRecommender<String, 
     private final Provider<FastPreferenceData<String, String>> tpp;
     private final UserNeighborhoodFactory unf;
     private final ItemNeighborhoodFactory inf;
-    private final FactorizationSupplierFactory fsf;
-    private final FMSupplierFactory fmsf;
+    private final FactorizationFactory ff;
+    private final FMFactory fmf;
 
     @Inject
     public RecommenderFactory(
@@ -54,52 +57,41 @@ public class RecommenderFactory implements MehtaFactory<FastRecommender<String, 
             @Named("targetUsers") Set<String> targetUsers,
             @Named("trainPreferences") Provider<FastPreferenceData<String, String>> tpp,
             UserNeighborhoodFactory unf, ItemNeighborhoodFactory inf,
-            FactorizationSupplierFactory fsf, FMSupplierFactory fmsf) {
+            FactorizationFactory ff, FMFactory fmf) {
         this.properties = properties;
         this.users = users;
         this.items = items;
         this.tpp = tpp;
         this.unf = unf;
         this.inf = inf;
-        this.fsf = fsf;
-        this.fmsf = fmsf;
+        this.ff = ff;
+        this.fmf = fmf;
     }
 
     @Override
-    public FastRecommender<String, String> create(MehtaParameters params) throws Exception {
-        FastRecommender<String, String> recommender;
-
-        switch (params.get("recommender")) {
+    public Optional<FastRecommender<String, String>> create(MehtaParameters params) {
+        switch (params.get("recommender", "")) {
             case "random":
-                recommender = new RandomRecommender(users, items);
-                break;
+                return Optional.of(new RandomRecommender<>(users, items));
             case "pop":
-                recommender = new PopularityRecommender<>(tpp.get());
-                break;
+                return Optional.of(new PopularityRecommender<>(tpp.get()));
             case "ub":
-                UserNeighborhood<String> un = unf.create(params.subset("neighborhood"));
-                recommender = new UserNeighborhoodRecommender<>(tpp.get(), un, params.getInt("q", 1));
-                break;
+                return params.subset("neighborhood").flatMap(unf::create)
+                        .map(un -> new UserNeighborhoodRecommender<>(tpp.get(), un, params.getInt("q", 1)));
             case "ib":
-                ItemNeighborhood<String> in = inf.create(params.subset("neighborhood"));
-                recommender = new ItemNeighborhoodRecommender<>(tpp.get(), in, params.getInt("q", 1));
-                break;
+                return params.subset("neighborhood").flatMap(inf::create)
+                        .map(in -> new ItemNeighborhoodRecommender<>(tpp.get(), in, params.getInt("q", 1)));
             case "mf":
-                Factorization<String, String> mf = fsf.create(params.subset("mf")).get();
-                SimpleFactorizationFormat.get().save(mf, Files.newOutputStream(properties.getModelFile(params.name())));
-                recommender = new MFRecommender<>(users, items, mf);
-                break;
+                Optional<Factorization<String, String>> mfo = params.subset("mf").flatMap(ff::create);
+                mfo.ifPresent(Unchecked.consumer(mf -> SimpleFactorizationFormat.get().save(mf, Files.newOutputStream(properties.getModelFile(params.name())))));
+                return mfo.map(mf -> new MFRecommender<>(users, items, mf));
             case "fm":
-                PreferenceFM<String, String> fm = fmsf.create(params.subset("fm")).get();
-                SimpleFMFormat.get().save(fm, Files.newOutputStream(properties.getModelFile(params.name())));
-                recommender = new FMRecommender<>(fm);
-                break;
+                Optional<PreferenceFM<String, String>> fmo = params.subset("fm").flatMap(fmf::create);
+                fmo.ifPresent(Unchecked.consumer(fm -> SimpleFMFormat.get().save(fm, Files.newOutputStream(properties.getModelFile(params.name())))));
+                return fmo.map(FMRecommender::new);
             default:
-                recommender = null;
-                break;
+                return Optional.empty();
         }
-
-        return recommender;
     }
 
 }

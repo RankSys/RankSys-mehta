@@ -10,14 +10,16 @@ package org.ranksys.mehta.factories.recommender;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.name.Named;
-import org.ranksys.recommenders.nn.item.sim.ItemSimilarity;
-import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.core.preference.fast.FastPreferenceData;
+import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.mehta.factories.MehtaFactory;
 import org.ranksys.recommenders.nn.item.sim.ItemSimilarities;
+import org.ranksys.recommenders.nn.item.sim.ItemSimilarity;
+
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
- *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
  */
 public class ItemSimilarityFactory implements MehtaFactory<ItemSimilarity<String>> {
@@ -31,33 +33,24 @@ public class ItemSimilarityFactory implements MehtaFactory<ItemSimilarity<String
     }
 
     @Override
-    public ItemSimilarity<String> create(MehtaParameters params) {
-            ItemSimilarity<String> itemSimilarity;
+    public Optional<ItemSimilarity<String>> create(MehtaParameters params) {
 
-            double alpha = params.getDouble("alpha", 0.5);
-            boolean dense = params.getBoolean("dense", true);
-            
-            switch (params.name()) {
-                case "cosine":
-                case "set-cosine":
-                    itemSimilarity = ItemSimilarities.setCosine(tpp.get(), alpha, dense);
-                    break;
-                case "vec-cosine":
-                    itemSimilarity = ItemSimilarities.vectorCosine(tpp.get(),  dense);
-                    break;
-                case "jaccard":
-                case "set-jaccard":
-                    itemSimilarity = ItemSimilarities.setJaccard(tpp.get(), dense);
-                    break;
-                case "vec-jaccard":
-                    itemSimilarity = ItemSimilarities.vectorJaccard(tpp.get(), dense);
-                    break;
-                default:
-                    itemSimilarity = null;
-                    break;
-            }
+        Supplier<Boolean> dense = () -> params.getBoolean("dense", true);
 
-            return itemSimilarity;
+        switch (params.name()) {
+            case "cosine":
+            case "set-cosine":
+                return Optional.of(ItemSimilarities.setCosine(tpp.get(), params.getDouble("alpha", 0.5), dense.get()));
+            case "vec-cosine":
+                return Optional.of(ItemSimilarities.vectorCosine(tpp.get(), dense.get()));
+            case "jaccard":
+            case "set-jaccard":
+                return Optional.of(ItemSimilarities.setJaccard(tpp.get(), dense.get()));
+            case "vec-jaccard":
+                return Optional.of(ItemSimilarities.vectorJaccard(tpp.get(), dense.get()));
+            default:
+                return Optional.empty();
+        }
     }
 
 }

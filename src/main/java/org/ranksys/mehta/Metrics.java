@@ -11,29 +11,33 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
-import static com.google.inject.name.Names.named;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-import static java.util.stream.Collectors.toList;
 import org.jooq.lambda.Unchecked;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import static java.util.stream.Collectors.toMap;
+import org.jooq.lambda.tuple.Tuple2;
 import org.ranksys.core.Recommendation;
 import org.ranksys.formats.rec.RecommendationFormat;
 import org.ranksys.mehta.config.MehtaModule;
-import org.ranksys.mehta.config.MehtaProperties;
 import org.ranksys.mehta.config.MehtaParameters;
+import org.ranksys.mehta.config.MehtaProperties;
 import org.ranksys.mehta.factories.metric.RecommendationMetricFactory;
 import org.ranksys.metrics.RecommendationMetric;
 import org.ranksys.metrics.basic.AverageRecommendationMetric;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import static com.google.inject.name.Names.named;
+import static java.util.stream.Collectors.toList;
+import static org.jooq.lambda.tuple.Tuple.tuple;
 
 /**
  *
@@ -67,7 +71,7 @@ public class Metrics {
 
     public void execute() throws Exception {
 
-        Map<String, RecommendationMetric<String, String>> recommendationMetrics = getRecommendationMetrics();
+        Collection<Tuple2<String, RecommendationMetric<String, String>>> recommendationMetrics = getRecommendationMetrics();
 
         MehtaParameters.read(in).forEach(Unchecked.consumer(params -> {
             String recName = params.name();
@@ -84,11 +88,21 @@ public class Metrics {
         }));
     }
 
-    private Map<String, RecommendationMetric<String, String>> getRecommendationMetrics() throws IOException {
+    private Collection<Tuple2<String, RecommendationMetric<String, String>>> getRecommendationMetrics() throws IOException {
         RecommendationMetricFactory rmf = injector.getInstance(RecommendationMetricFactory.class);
 
         return MehtaParameters.read(Files.newInputStream(metricsFile))
-                .collect(toMap(MehtaParameters::name, rmf::create));
+                .map(params -> {
+                    String name = params.name();
+                    Optional<RecommendationMetric<String, String>> metric = rmf.create(params);
+                    if (!metric.isPresent()) {
+                        LOG.log(Level.SEVERE, "Could not parse metric {0}", name);
+                    }
+                    return tuple(name, metric);
+                })
+                .filter(t -> t.v2.isPresent())
+                .map(t -> tuple(t.v1, t.v2.get()))
+                .collect(toList());
     }
 
     private List<Recommendation<String, String>> readRecommendations(String recName) throws IOException {
@@ -104,20 +118,19 @@ public class Metrics {
     }
 
     private void evaluateRecommendationMetrics(
-            Map<String, RecommendationMetric<String, String>> recommendationMetrics,
-            String recName, List<Recommendation<String, String>> recommendations) throws IOException {
+            Collection<Tuple2<String, RecommendationMetric<String, String>>> recommendationMetrics,
+            String recName, List<Recommendation<String, String>> recommendations) {
         int numUsers = injector.getInstance(Key.get(new TypeLiteral<Set<String>>() {}, named("targetUsers"))).size();
 
-        recommendationMetrics.forEach(Unchecked.biConsumer((metricName, metric) -> {
+        recommendationMetrics.forEach(Unchecked.consumer(t -> {
+            String metricName = t.v1;
+            RecommendationMetric<String, String> metric = t.v2;
+
             double avg = recommendations.parallelStream()
                     .collect(
                             () -> new AverageRecommendationMetric<>(metric, numUsers),
-                            (m, r) -> {
-                                double v = m.addAndEvaluate(r);
-
-                                println(recName, metricName, r.getUser(), Double.toString(v));
-                            },
-                            (m1, m2) -> m1.combine(m2)
+                            (m, r) -> println(recName, metricName, r.getUser(), Double.toString(m.addAndEvaluate(r))),
+                            AverageRecommendationMetric::combine
                     )
                     .evaluate();
 

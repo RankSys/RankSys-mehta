@@ -8,13 +8,15 @@
 package org.ranksys.mehta.factories.recommender;
 
 import com.google.inject.Inject;
-import java.util.function.Supplier;
 import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.mehta.factories.MehtaFactory;
 import org.ranksys.novdiv.inverted.neighborhood.InvertedItemNeighborhood;
 import org.ranksys.recommenders.nn.item.neighborhood.ItemNeighborhood;
 import org.ranksys.recommenders.nn.item.neighborhood.ItemNeighborhoods;
 import org.ranksys.recommenders.nn.item.sim.ItemSimilarity;
+
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  *
@@ -30,33 +32,30 @@ public class ItemNeighborhoodFactory implements MehtaFactory<ItemNeighborhood<St
     }
 
     @Override
-    public ItemNeighborhood<String> create(MehtaParameters params) throws Exception {
-        ItemNeighborhood<String> itemNeighborhood;
+    public Optional<ItemNeighborhood<String>> create(MehtaParameters params) {
 
-        Supplier<ItemSimilarity<String>> iss = () -> isf.create(params.subset("sim"));
-        boolean cached = params.getBoolean("cached", true);
+        Supplier<Optional<ItemSimilarity<String>>> iss = () -> params.subset("sim").flatMap(isf::create);
 
+        Optional<ItemNeighborhood<String>> itemNeighborhood;
         switch (params.name()) {
             case "knn":
-                itemNeighborhood = ItemNeighborhoods.topK(iss.get(), params.getInt("k", 10));
+                itemNeighborhood = iss.get().map(is -> ItemNeighborhoods.topK(is, params.getInt("k", 10)));
                 break;
             case "threshold":
-                itemNeighborhood = ItemNeighborhoods.threshold(iss.get(), params.getDouble("t"));
+                itemNeighborhood = iss.get().flatMap(is -> params.getDouble("t").map(t -> ItemNeighborhoods.threshold(is, t)));
                 break;
             case "inverted":
-                itemNeighborhood = ItemNeighborhoods.topK(iss.get(), params.getInt("k", 10));
-                itemNeighborhood = new InvertedItemNeighborhood<>(itemNeighborhood);
-                cached = false;
+                itemNeighborhood = iss.get()
+                        .map(is -> ItemNeighborhoods.topK(is, params.getInt("k", 10)))
+                        .map(InvertedItemNeighborhood::new);
                 break;
             default:
-                itemNeighborhood = null;
+                itemNeighborhood = Optional.empty();
         }
 
-        if (cached) {
-            itemNeighborhood = ItemNeighborhoods.cached(itemNeighborhood);
-        }
+        boolean cached = params.getBoolean("cached", false) && !params.name().equals("inverted");
 
-        return itemNeighborhood;
+        return itemNeighborhood.map(in -> cached ? ItemNeighborhoods.cached(in) : in);
     }
 
 }

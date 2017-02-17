@@ -8,23 +8,17 @@
 package org.ranksys.mehta.factories.metric;
 
 import com.google.inject.Inject;
-import java.util.function.Supplier;
 import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.mehta.factories.MehtaFactory;
 import org.ranksys.metrics.RecommendationMetric;
-import org.ranksys.metrics.basic.FScore;
-import org.ranksys.metrics.basic.KCall;
-import org.ranksys.metrics.basic.NDCG;
-import org.ranksys.metrics.basic.NumRetrieved;
-import org.ranksys.metrics.basic.Precision;
-import org.ranksys.metrics.basic.Recall;
-import org.ranksys.metrics.basic.ReciprocalRank;
-import org.ranksys.metrics.basic.Recommendability;
+import org.ranksys.metrics.basic.*;
 import org.ranksys.metrics.rel.IdealRelevanceModel;
 import org.ranksys.metrics.rel.RelevanceModel;
 
+import java.util.Optional;
+import java.util.function.Supplier;
+
 /**
- *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
  */
 public class RecommendationMetricFactory implements MehtaFactory<RecommendationMetric<String, String>> {
@@ -37,44 +31,33 @@ public class RecommendationMetricFactory implements MehtaFactory<RecommendationM
     }
 
     @Override
-    public RecommendationMetric<String, String> create(MehtaParameters params) {
-        RecommendationMetric<String, String> metric;
+    public Optional<RecommendationMetric<String, String>> create(MehtaParameters params) {
 
-        int cutoff = params.getInt("cutoff", 10);
+        Supplier<Integer> cutoff = () -> params.getInt("cutoff", 10);
+        Supplier<Optional<RelevanceModel<String, String>>> rms = () -> params.subset("rel").flatMap(rmf::create);
 
-        Supplier<RelevanceModel<String, String>> rms = () -> rmf.create(params.subset("rel"));
-
-        switch (params.get("metric")) {
-            case "prec":
-                metric = new Precision<>(cutoff, rms.get());
-                break;
-            case "recall":
-                metric = new Recall<>(cutoff, (IdealRelevanceModel<String, String>) rms.get());
-                break;
-            case "fscore":
-                metric = new FScore<>(cutoff, (IdealRelevanceModel<String, String>) rms.get());
-                break;
-            case "hitrate":
-            case "onecall":
-                metric = new KCall<>(cutoff, 1, rms.get());
-                break;
-            case "rr":
-                metric = new ReciprocalRank<>(cutoff, rms.get());
-                break;
-            case "ndcg":
-                metric = new NDCG<>(cutoff, (NDCG.NDCGRelevanceModel<String, String>) rms.get());
-                break;
-            case "numq":
-                metric = new Recommendability<>();
-                break;
-            case "numret":
-                metric = new NumRetrieved<>();
-                break;
-            default:
-                metric = null;
-                break;
-        }
-
-        return metric;
+        return params.get("metric").flatMap(metricName -> {
+            switch (metricName) {
+                case "prec":
+                    return rms.get().map(rm -> new Precision<>(cutoff.get(), rm));
+                case "recall":
+                    return rms.get().map(rm -> new Recall<>(cutoff.get(), (IdealRelevanceModel<String, String>) rm));
+                case "fscore":
+                    return rms.get().map(rm -> new FScore<>(cutoff.get(), (IdealRelevanceModel<String, String>) rm));
+                case "hitrate":
+                case "onecall":
+                    return rms.get().map(rm -> new KCall<>(cutoff.get(), 1, rm));
+                case "rr":
+                    return rms.get().map(rm -> new ReciprocalRank<>(cutoff.get(), rm));
+                case "ndcg":
+                    return rms.get().map(rm -> new NDCG<>(cutoff.get(), (NDCG.NDCGRelevanceModel<String, String>) rm));
+                case "numq":
+                    return Optional.of(new Recommendability<>());
+                case "numret":
+                    return Optional.of(new NumRetrieved<>());
+                default:
+                    return Optional.empty();
+            }
+        });
     }
 }

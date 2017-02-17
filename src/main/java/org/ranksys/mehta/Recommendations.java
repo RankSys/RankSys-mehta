@@ -11,23 +11,25 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
+import org.jooq.lambda.Unchecked;
+import org.ranksys.evaluation.runner.RecommenderRunner;
+import org.ranksys.formats.rec.RecommendationFormat;
+import org.ranksys.formats.rec.RecommendationFormat.Writer;
+import org.ranksys.mehta.config.MehtaModule;
+import org.ranksys.mehta.config.MehtaParameters;
+import org.ranksys.mehta.config.MehtaProperties;
+import org.ranksys.mehta.factories.recommender.RecommenderFactory;
 import org.ranksys.recommenders.fast.FastRecommender;
+
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.jooq.lambda.Unchecked;
-import org.ranksys.evaluation.runner.RecommenderRunner;
-import org.ranksys.formats.rec.RecommendationFormat;
-import org.ranksys.formats.rec.RecommendationFormat.Writer;
-import org.ranksys.mehta.config.MehtaModule;
-import org.ranksys.mehta.config.MehtaProperties;
-import org.ranksys.mehta.factories.recommender.RecommenderFactory;
-import org.ranksys.mehta.config.MehtaParameters;
 
 /**
  *
@@ -54,7 +56,7 @@ public class Recommendations {
         this.in = in;
     }
 
-    public void execute() throws Exception {
+    public void execute() {
         RecommenderFactory rf = injector.getInstance(RecommenderFactory.class);
         RecommendationFormat<String, String> format = injector.getInstance(Key.get(new TypeLiteral<RecommendationFormat<String, String>>() {}));
         RecommenderRunner<String, String> rr = injector.getInstance(Key.get(new TypeLiteral<RecommenderRunner<String, String>>() {}));
@@ -68,8 +70,8 @@ public class Recommendations {
                 return;
             }
 
-            FastRecommender<String, String> recommender = rf.create(params);
-            if (recommender == null) {
+            Optional<FastRecommender<String, String>> recommender = rf.create(params);
+            if (!recommender.isPresent()) {
                 LOG.log(Level.WARNING, "{0} not recognized", recName);
                 return;
             }
@@ -77,8 +79,10 @@ public class Recommendations {
             LOG.log(Level.INFO, "{0} in process", recName);
 
             try (Writer<String, String> writer = format.getWriter(recommendationFile)) {
-                rr.run(recommender, writer);
+                rr.run(recommender.get(), writer);
             }
+
+            LOG.log(Level.INFO, "{0} completed", recName);
         }));
     }
 

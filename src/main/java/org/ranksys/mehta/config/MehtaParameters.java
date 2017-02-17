@@ -10,74 +10,85 @@ package org.ranksys.mehta.config;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import static java.lang.Boolean.parseBoolean;
-import static java.lang.Double.parseDouble;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
+
+import static java.lang.Boolean.parseBoolean;
+import static java.lang.Double.parseDouble;
 import static java.lang.Integer.parseInt;
 import static java.util.stream.Collectors.toMap;
 
 /**
- *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
  */
 public class MehtaParameters {
 
+    private static final Logger LOG = Logger.getLogger(MehtaParameters.class.getName());
+
+    private final String parent;
     private final String name;
     private final Map<String, String> parameters;
 
-    public MehtaParameters(String name, Map<String, String> parameters) {
+    public MehtaParameters(String parent, String name, Map<String, String> parameters) {
+        this.parent = parent;
         this.name = name;
         this.parameters = parameters;
     }
 
-    public MehtaParameters subset(String prefix) {
-        String subName = parameters.get(prefix);
-        Map<String, String> subParams = parameters.keySet().stream()
-                .filter(k -> k.startsWith(prefix + "."))
-                .collect(toMap(k -> k.replaceFirst(prefix + ".", ""), k -> parameters.get(k)));
+    public Optional<MehtaParameters> subset(String prefix) {
+        return get(prefix).map(subName -> {
+            Map<String, String> subParams = parameters.keySet().stream()
+                    .filter(k -> k.startsWith(prefix + "."))
+                    .collect(toMap(k -> k.replaceFirst(prefix + ".", ""), parameters::get));
 
-        return new MehtaParameters(subName, subParams);
+            return new MehtaParameters(parent + prefix + ".", subName, subParams);
+        });
     }
 
     public String name() {
         return name;
     }
 
-    public String get(String key) {
-        return parameters.get(key);
+    public Optional<String> get(String key) {
+        if (!parameters.containsKey(key)) {
+            LOG.log(Level.SEVERE, "Parameter {0}{1} not present", new Object[]{parent, key});
+        }
+        return Optional.ofNullable(parameters.get(key));
     }
 
     public String get(String key, String def) {
+        if (!parameters.containsKey(key)) {
+            LOG.log(Level.WARNING, "Parameter {0}{1} not present, using default {2}", new Object[]{parent, key, def});
+        }
         return parameters.getOrDefault(key, def);
     }
 
-    public double getDouble(String key) {
-        return parseDouble(parameters.get(key));
+    public Optional<Double> getDouble(String key) {
+        return get(key).map(Double::parseDouble);
     }
 
     public double getDouble(String key, double def) {
-        return parseDouble(parameters.getOrDefault(key, Double.toString(def)));
+        return parseDouble(get(key, Double.toString(def)));
     }
 
-    public int getInt(String key) {
-        return parseInt(parameters.get(key));
+    public Optional<Integer> getInt(String key) {
+        return get(key).map(Integer::parseInt);
     }
 
     public int getInt(String key, int def) {
-        return parseInt(parameters.getOrDefault(key, Integer.toString(def)));
+        return parseInt(get(key, Integer.toString(def)));
     }
 
-    public boolean getBoolean(String key) {
-        return parseBoolean(parameters.get(key));
+    public Optional<Boolean> getBoolean(String key) {
+        return get(key).map(Boolean::parseBoolean);
     }
 
     public boolean getBoolean(String key, boolean def) {
-        return parseBoolean(parameters.getOrDefault(key, Boolean.toString(def)));
+        return parseBoolean(get(key, Boolean.toString(def)));
     }
 
     @Override
@@ -100,10 +111,7 @@ public class MehtaParameters {
             return false;
         }
         final MehtaParameters other = (MehtaParameters) obj;
-        if (!Objects.equals(this.name, other.name)) {
-            return false;
-        }
-        return Objects.equals(this.parameters, other.parameters);
+        return Objects.equals(this.name, other.name) && Objects.equals(this.parameters, other.parameters);
     }
 
     private static final Predicate<String> IS_EMPTY = String::isEmpty;
@@ -135,8 +143,14 @@ public class MehtaParameters {
         Map<String, String> parameters = new HashMap<>();
         Stream.of(tokens).skip(1)
                 .map(t -> t.split("="))
-                .forEach(tt -> parameters.put(tt[0], tt[1]));
+                .forEach(tt -> {
+                    if (tt.length == 2) {
+                        parameters.put(tt[0], tt[1]);
+                    } else {
+                        LOG.log(Level.SEVERE, "Malformed parameter {0}", String.join("=", tt));
+                    }
+                });
 
-        return new MehtaParameters(name, parameters);
+        return new MehtaParameters("", name, parameters);
     }
 }

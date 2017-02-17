@@ -8,10 +8,9 @@
 package org.ranksys.mehta.config;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  *
@@ -32,7 +31,7 @@ public class MehtaProperties extends java.util.Properties {
         if (containsKey("basePath")) {
             this.basePath = Paths.get(getProperty("basePath"));
         } else {
-            this.basePath = configFile.getParent();
+            this.basePath = configFile.toAbsolutePath().getParent();
         }
 
         putIfAbsent("usersFile", basePath.resolve("users.txt").toString());
@@ -45,16 +44,11 @@ public class MehtaProperties extends java.util.Properties {
         putIfAbsent("filters", DEFAULT_FILTERS);
         putIfAbsent("format", DEFAULT_FORMAT);
         putIfAbsent("ignoreScores", DEFAULT_IGNORE_SCORES);
-    }
 
-    @Override
-    public final synchronized void load(InputStream inStream) throws IOException {
-        super.load(inStream);
-    }
-
-    @Override
-    public final String getProperty(String key) {
-        return super.getProperty(key);
+        // create missing directories
+        getPath("featurePath", "features").toFile().mkdir();
+        getPath("modelsPath", "models").toFile().mkdir();
+        getPath("recommendationPath", "recommendations").toFile().mkdir();
     }
 
     public Path getBasePath() {

@@ -10,8 +10,6 @@ package org.ranksys.mehta.factories.recommender;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.name.Named;
-import static java.lang.Double.NaN;
-import java.util.function.Supplier;
 import org.ranksys.core.preference.fast.FastPreferenceData;
 import org.ranksys.mehta.config.MehtaParameters;
 import org.ranksys.mehta.factories.MehtaFactory;
@@ -21,49 +19,48 @@ import org.ranksys.recommenders.mf.als.HKVFactorizer;
 import org.ranksys.recommenders.mf.als.PZTFactorizer;
 import org.ranksys.recommenders.mf.plsa.PLSAFactorizer;
 
+import java.util.Optional;
+import java.util.function.Supplier;
+
 /**
  *
  * @author Saúl Vargas (Saul@VargasSandoval.es)
  */
-public class FactorizationSupplierFactory implements MehtaFactory<Supplier<Factorization<String, String>>> {
+public class FactorizationFactory implements MehtaFactory<Factorization<String, String>> {
 
     private final Provider<FastPreferenceData<String, String>> tpp;
 
     @Inject
-    public FactorizationSupplierFactory(
+    public FactorizationFactory(
             @Named("trainPreferences") Provider<FastPreferenceData<String, String>> tpp) {
         this.tpp = tpp;
     }
 
     @Override
-    public Supplier<Factorization<String, String>> create(MehtaParameters params) throws Exception {
-        Factorizer<String, String> factorizer;
+    public Optional<Factorization<String, String>> create(MehtaParameters params) {
 
-        double reg = params.getDouble("reg", NaN);
-        double alpha = params.getDouble("alpha", NaN);
-        int numIter = params.getInt("numIter");
-        int K = params.getInt("k", 50);
+        Supplier<Double> reg = () -> params.getDouble("reg", 1.0);
+        Supplier<Double> alpha = () -> params.getDouble("alpha", 1.0);
 
+        Optional<Factorizer<String, String>> factorizer;
         switch (params.name()) {
             case "hkv":
-                factorizer = new HKVFactorizer<>(reg, x -> 1 + alpha * x, numIter);
+                double a1 = alpha.get();
+                factorizer = Optional.of(new HKVFactorizer<>(reg.get(), x -> 1 + a1 * x, params.getInt("numIter", 20)));
                 break;
             case "pzt":
-                factorizer = new PZTFactorizer<>(reg, x -> 1 + alpha * x, numIter);
+                double a2 = alpha.get();
+                factorizer = Optional.of(new PZTFactorizer<>(reg.get(), x -> 1 + a2 * x, params.getInt("numIter", 20)));
                 break;
             case "plsa":
-                factorizer = new PLSAFactorizer<>(numIter);
+                factorizer = Optional.of(new PLSAFactorizer<>(params.getInt("numIter", 100)));
                 break;
             default:
-                factorizer = null;
+                factorizer = Optional.empty();
                 break;
         }
 
-        if (factorizer == null) {
-            return () -> null;
-        } else {
-            return () -> factorizer.factorize(K, tpp.get());
-        }
+        return factorizer.map(f -> f.factorize(params.getInt("k", 50), tpp.get()));
     }
 
 }
