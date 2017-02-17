@@ -16,42 +16,49 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <ranksys.version>0.5.0-SNAPSHOT</ranksys.version>
+        <ranksys.version>1.0.0-SNAPSHOT</ranksys.version>
     </properties>
-    
+
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
-            <groupId>org.ranksys</groupId>
+            <groupId>org.ranksys.RankSys</groupId>
             <artifactId>RankSys-metrics</artifactId>
             <version>${ranksys.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.ranksys</groupId>
+            <groupId>org.ranksys.RankSys</groupId>
             <artifactId>RankSys-evaluation</artifactId>
             <version>${ranksys.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.ranksys</groupId>
+            <groupId>org.ranksys.RankSys</groupId>
             <artifactId>RankSys-recommenders</artifactId>
             <version>${ranksys.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.ranksys</groupId>
+            <groupId>org.ranksys.RankSys</groupId>
             <artifactId>RankSys-novdiv</artifactId>
             <version>${ranksys.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.ranksys</groupId>
+            <groupId>org.ranksys.RankSys</groupId>
             <artifactId>RankSys-core</artifactId>
             <version>${ranksys.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.ranksys</groupId>
+            <groupId>org.ranksys.RankSys</groupId>
             <artifactId>RankSys-compression</artifactId>
             <version>${ranksys.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.ranksys</groupId>
+            <groupId>org.ranksys.RankSys</groupId>
             <artifactId>RankSys-formats</artifactId>
             <version>${ranksys.version}</version>
         </dependency>
